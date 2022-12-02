@@ -19,6 +19,7 @@ contract RPSGame {
 
     Player[2] public players;
 
+    // Play Rock Paper Scissors game
     function play(bytes32 _hash_choice) public payable {
         require(msg.value >= 10000000000000000, "Must send 0.01 Value");
         // bytes32 hash_choice = keccak256(abi.encodePacked(secret, _choice));
@@ -29,15 +30,22 @@ contract RPSGame {
             require(players[0].player != msg.sender, "Already played !");
             players[1] = Player(payable(msg.sender), _hash_choice);
             is_ended = true;
-            transfer(payable(check_winner()));
+            if (check_winner() != address(0)) {
+                transfer(payable(check_winner()), address(this).balance);
+            } else {
+                transfer(payable(players[0].player), address(this).balance / 2);
+                transfer(payable(players[1].player), address(this).balance);
+            }
             reset_game();
         }
     }
 
+    // Convert your choice to bytes32 as the argument of play function
     function hash_choice(Choice _choice) public view returns (bytes32) {
         return keccak256(abi.encodePacked(secret, _choice));
     }
 
+    // Generate a random secret
     function random() private view returns (uint256) {
         return
             uint256(
@@ -51,7 +59,8 @@ contract RPSGame {
             );
     }
 
-    function return_choice(bytes32 _hash_choice)
+    // Convert your choice into original
+    function decode_choice(bytes32 _hash_choice)
         private
         view
         returns (uint256)
@@ -66,12 +75,13 @@ contract RPSGame {
         return 2;
     }
 
+    // Check who the winner is
     function check_winner() public view returns (address) {
         // require(players[0].player != address(0) && players[1].player != address(0), "Not started yet !");
         require(is_ended, "Not started yet !");
 
-        uint256 choice_1 = return_choice(players[0].choice);
-        uint256 choice_2 = return_choice(players[1].choice);
+        uint256 choice_1 = decode_choice(players[0].choice);
+        uint256 choice_2 = decode_choice(players[1].choice);
 
         if (choice_1 == choice_2) return address(0);
         if (choice_1 == 0 && choice_2 == 2) return players[0].player;
@@ -80,11 +90,13 @@ contract RPSGame {
         return players[1].player;
     }
 
-    function transfer(address payable _to) private {
-        (bool success, ) = _to.call{value: address(this).balance}("");
+    // Transfer reward to the winner
+    function transfer(address payable _to, uint256 amount) private {
+        (bool success, ) = _to.call{value: amount}("");
         require(success, "Failed to send Ether");
     }
 
+    // Reset new game
     function reset_game() private {
         require(is_ended, "Game is not ended!");
         delete players[0];
